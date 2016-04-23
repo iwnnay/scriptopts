@@ -1,8 +1,9 @@
 <?php
 namespace ScriptOpts;
 
-class Options {
+class ScriptOpts {
     public function __construct()
     {
+        echo 'HAHAHAHAHAH';
     }
 }

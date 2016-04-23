@@ -8,5 +8,7 @@
             "email": "iwnnay@gmail.com"
         }
     ],
-    "require": {}
+    "autoload": {
+      "psr-4": { "ScriptOpts\\": "/" }
+    }
 }
