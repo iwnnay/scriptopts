@@ -1,0 +1,12 @@
+{
+    "name": "iwnnay/scriptopts",
+    "description": "This is a library to help quickly add options and help menus to PHP written command line scripts.",
+    "license": "Apache 2.0",
+    "authors": [
+        {
+            "name": "Joe Imhoff",
+            "email": "iwnnay@gmail.com"
+        }
+    ],
+    "require": {}
+}
