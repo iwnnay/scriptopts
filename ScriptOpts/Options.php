@@ -33,6 +33,21 @@ class Options
      */
     private $designations;
 
+    /*
+     * @var array specifications
+     */
+    private $specifications;
+
+    /*
+     * @var array parsedOptions
+     */
+    private $parsedOptions = [];
+
+    /*
+     * @var object customErrorHandler
+     */
+    private $customErrorHandler;
+
     public function __construct()
     {
         $args = func_get_args();
@@ -47,21 +62,31 @@ class Options
         } else {
             $this->add($options);
         }
-
-
-        $this->parseOptions();
     }
 
-    private function specifiedUsageStatement($value = null)
+    public static function parseNow()
     {
-        if ($value && !is_string($value)) {
-            throw \Exception('First parameter passed to Options must be a string');
+        $options = new \ReflectionClass('ScriptOpts\Options');
+        $options = $options->newInstanceArgs(func_get_args());
+        return $options->parse();
+    }
 
-        } elseif (is_null($value)) {
-            return $this->specifiedUsageStatement;
+    public function parse()
+    {
+        try {
+            $this->parseOptions();
+        } catch(\Exception $error) {
+            $this->handleError($error);
         }
 
-        $this->specifiedUsageStatement = $value;
+        return $this;
+    }
+
+    public function setErrorHandler($errorHandlerFunction)
+    {
+        if (is_callable($errorHandlerFunction)) {
+            $this->customErrorHandler = $errorHandlerFunction;
+        }
     }
 
     public function get($option) {
@@ -70,6 +95,11 @@ class Options
         } else {
             return null;
         }
+    }
+
+    public function getOptions()
+    {
+        return $this->parseOptions;
     }
 
     public function displayManPage()
@@ -87,49 +117,138 @@ class Options
         print "\n\n\n";
     }
 
-    private function add($args)
+    private function handleError($error)
     {
-        if ($args[1]) {
-            $this->shortOptions[] = $args[1];
+        if (is_callable($this->customErrorHandler)) {
+            call_user_func($this->customErrorHandler, $error);
         }
-        $this->longOptions[] = $args[0];
 
-        $this->scriptOptions[] = $args;
+        die($error->getMessage());
     }
 
     private function parseOptions()
     {
-        $parsed = [];
-        die('here');
+        global $argv;
+        $args = $argv;
+        $this->parsedOptions['scriptName'] = array_shift($args);
 
-        foreach($this->scriptOptions as $args) {
-            $long = str_replace(':', '', array_shift($args));
-            $short = str_replace(':', '', array_shift($args));
-            $description = array_shift($args);
+        while($args) {
+            $inQuestion = array_shift($args);
 
-            if (isset($opts[$short])) {
-                $parsed[$long] = $opts[$short] ?: true;
-            }
+            if (strpos($inQuestion, '--') === 0) {
+                $this->handleLong(ltrim($inQuestion, '--'), $args);
 
-            if (isset($opts[$long])) {
-                $parsed[$long] = $opts[$long] ?: true;
-            }
+            } elseif (strpos($inQuestion, '-') === 0) {
+                foreach(str_split(ltrim($inQuestion, '-')) as $key) {
+                    $this->handleShort($inQuestion, $key, $args);
+                }
 
-            if (!isset($parsed[$long])) {
-                $parsed[$long] = false;
-            }
-
-            if ($parsed[$long] && $args) {
-                $this->handleExtras($parsed[$long], $args);
+            } else {
+                $this->handleDesignation($inQuestion);
             }
         }
-
-        $this->parsedOptions = $parsed;
     }
 
-    private function handleExtras($value, $extras)
+    private function add($args)
     {
-        if ($extras['callback']) {
+        $long = array_shift($args);
+
+        $this->longOptions[] = $long;
+        $this->shortOptions[] = array_shift($args);
+        $long = rtrim($long, ':');
+        $this->specifications[$long]['description'] = array_shift($args);
+
+        array_merge($this->specifications[$long], $args);
+    }
+
+    private function specifiedUsageStatement($value = null)
+    {
+        if ($value && !is_string($value)) {
+            throw \Exception('First parameter passed to Options must be a string');
+
+        } elseif (is_null($value)) {
+            return $this->specifiedUsageStatement;
+        }
+
+        $this->specifiedUsageStatement = $value;
+    }
+
+    private function handleLong($opt, &$otherArguments) {
+        $inLong = array_search($opt, $this->longOptions);
+        if ($inLong !== false) {
+            $this->parsedOptions[$opt] = true;
+        }
+
+        if(strpos($opt, '=') != false) {
+            list($opt, $value) = explode('=', $opt);
+        }
+
+        $inLongWithValue = array_search($opt.':', $this->longOptions);
+        if ($inLongWithValue !== false) {
+            if (!$value) {
+                $value = array_shift($otherArguments);
+            }
+
+            if (is_null($value)) {
+                throw new Exceptions\NoLongValue($opt);
+            }
+
+            return $this->parsedOptions[$opt] = $value;
+        }
+
+        if (isset($this->parsedOptions[$opt])) {
+            $this->handleSpecifications($opt);
+        } else {
+            throw new Exceptions\InvalidOption("--$opt");
+        }
+    }
+
+    private function handleShort($arg, $opt, &$otherArguments)
+    {
+        $longName = null;
+
+        $inShort = array_search($opt, $this->shortOptions);
+        if ($inShort !== false) {
+            $longName = $this->longOptions[$inShort];
+            $this->parsedOptions[$longName] = true;
+        }
+
+        $inShort = array_search($opt.':', $this->shortOptions);
+        if ($inShort !== false) {
+            $value = array_shift($otherArguments);
+
+            if (strpos($arg, $opt) != strlen($arg) - 1 || is_null($value)) {
+                throw new Exceptions\NoShortValue($opt);
+            }
+
+            $longName = str_replace(':', '', $this->longOptions[$inShort]);
+            $this->parsedOptions[$longName] = $value;
+        }
+
+        if (isset($this->parsedOptions[$longName])) {
+            $this->handleSpecifications($longName);
+        } else {
+            throw new Exceptions\InvalidOption("-$opt");
+        }
+    }
+
+    private function handleDesignation($value)
+    {
+        global $argv;
+        $var = array_shift($this->designations);
+        if (is_null($var)) {
+            throw new Exceptions\MissingDesignation($value);
+        }
+
+        $this->parsedOptions[$var] = $value;
+        $this->$var = $value;
+        $argv[$var] = $value;
+    }
+
+    private function handleSpecifications($value)
+    {
+        $extras = $this->specifications[$value];
+        if (isset($extras['callback'])) {
             if (is_array($extras['callback'])) {
                 list($object, $method) = $extras['callback'];
                 $object->$method($value, $this);
