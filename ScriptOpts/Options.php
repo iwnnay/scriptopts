@@ -62,6 +62,7 @@ class Options
         } else {
             $this->add($options);
         }
+        $this->addHelpOption();
     }
 
     public static function parseNow()
@@ -147,10 +148,12 @@ class Options
                 $this->handleDesignation($inQuestion);
             }
         }
+        var_dump($this->parsedOptions);
     }
 
     private function add($args)
     {
+        $this->scriptOptions[] = $args;
         $long = array_shift($args);
 
         $this->longOptions[] = $long;
@@ -158,7 +161,16 @@ class Options
         $long = rtrim($long, ':');
         $this->specifications[$long]['description'] = array_shift($args);
 
-        array_merge($this->specifications[$long], $args);
+        $this->specifications[$long] =
+            array_merge($this->specifications[$long], $args);
+    }
+
+    private function addHelpOption()
+    {
+        if (!isset($this->longOptions['help'])) {
+            $this->add(['help', 'h', 'Display this screeen',
+                'callback' => [$this, 'displayManPage']]);
+        }
     }
 
     private function specifiedUsageStatement($value = null)
@@ -174,6 +186,7 @@ class Options
     }
 
     private function handleLong($opt, &$otherArguments) {
+        $value = null;
         $inLong = array_search($opt, $this->longOptions);
         if ($inLong !== false) {
             $this->parsedOptions[$opt] = true;
@@ -245,10 +258,11 @@ class Options
         $argv[$var] = $value;
     }
 
-    private function handleSpecifications($value)
+    private function handleSpecifications($longName)
     {
-        $extras = $this->specifications[$value];
+        $extras = $this->specifications[$longName];
         if (isset($extras['callback'])) {
+            $value = $this->parsedOptions[$longName];
             if (is_array($extras['callback'])) {
                 list($object, $method) = $extras['callback'];
                 $object->$method($value, $this);
