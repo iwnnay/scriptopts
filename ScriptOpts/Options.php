@@ -55,13 +55,14 @@ class Options
         $options = array_shift($args);
         $this->designations = $args;
 
-        if (is_array($options[0])) {
+        if (isset($options[0]) && is_array($options[0])) {
             foreach($options as $option) {
                 $this->add($option);
             }
-        } else {
+        } elseif ($options) {
             $this->add($options);
         }
+
         $this->addHelpOption();
     }
 
@@ -124,7 +125,12 @@ class Options
             call_user_func($this->customErrorHandler, $error);
         }
 
-        die($error->getMessage());
+        print "---\n";
+        print $error->getMessage();
+        print "---\n";
+
+        $this->displayManPage();
+        die();
     }
 
     private function parseOptions()
@@ -148,7 +154,16 @@ class Options
                 $this->handleDesignation($inQuestion);
             }
         }
-        var_dump($this->parsedOptions);
+        $this->checkRequiredDesignations();
+    }
+
+    private function checkRequiredDesignations()
+    {
+        foreach($this->designations as $designation) {
+            if (strpos($designation, '*') == 0) {
+                throw new Exceptions\MissingRequiredDesignation(ltrim($designation, '*'));
+            }
+        }
     }
 
     private function add($args)
@@ -249,6 +264,7 @@ class Options
     {
         global $argv;
         $var = array_shift($this->designations);
+
         if (is_null($var)) {
             throw new Exceptions\MissingDesignation($value);
         }
