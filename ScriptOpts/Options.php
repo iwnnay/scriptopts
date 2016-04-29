@@ -160,7 +160,7 @@ class Options
     private function checkRequiredDesignations()
     {
         foreach($this->designations as $designation) {
-            if (strpos($designation, '*') == 0) {
+            if (strpos($designation, '*') === 0) {
                 throw new Exceptions\MissingRequiredDesignation(ltrim($designation, '*'));
             }
         }
@@ -268,6 +268,8 @@ class Options
         if (is_null($var)) {
             throw new Exceptions\MissingDesignation($value);
         }
+
+        $var = trim($var, '*');
 
         $this->parsedOptions[$var] = $value;
         $this->$var = $value;
