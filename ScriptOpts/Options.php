@@ -176,7 +176,7 @@ class Options
     private function specifiedUsageStatement($value = null)
     {
         if ($value && !is_string($value)) {
-            throw \Exception('First parameter passed to Options must be a string');
+            throw new \Exception('First parameter passed to Options must be a string');
 
         } elseif (is_null($value)) {
             return $this->specifiedUsageStatement;
