@@ -370,7 +370,7 @@ class Options
         $longName = null;
 
         $inShort = array_search($opt, $this->shortOptions);
-        if ($inShort !== false) {
+        if ($inShort !== false && strpos($this->longOptions[$inShort], ':') !== false) {
             $longName = $this->longOptions[$inShort];
             $this->parsedOptions[$longName] = true;
         } else {
@@ -381,7 +381,7 @@ class Options
 
             $inShort = array_search($opt.':', $this->shortOptions);
             if ($inShort !== false) {
-                if (!$value) {
+                if (!isset($value)) {
                     $value = array_shift($otherArguments);
                 }
 
